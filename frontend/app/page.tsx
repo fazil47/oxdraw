@@ -13,6 +13,8 @@ import WasmDiagramCanvas from "../components/WasmDiagramCanvas";
 import MarkdownViewer from "../components/MarkdownViewer";
 import CodePanel from "../components/CodePanel";
 import {
+  addEdge,
+  addNode,
   buildLocalShareUrl,
   deleteEdge,
   deleteNode,
@@ -366,6 +368,15 @@ const copyTextToClipboard = async (text: string): Promise<void> => {
 
 const LOCAL_MODE = isLocalMode();
 
+function generateUnusedNodeId(nodes: NodeData[]): string {
+  const existing = new Set(nodes.map((node) => node.id));
+  let index = nodes.length + 1;
+  while (existing.has(`N${index}`)) {
+    index += 1;
+  }
+  return `N${index}`;
+}
+
 export default function Home() {
   const [diagram, setDiagram] = useState<DiagramData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -377,6 +388,8 @@ export default function Home() {
   const [sourceError, setSourceError] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
+  const [connectMode, setConnectMode] = useState(false);
+  const [connectSourceNodeId, setConnectSourceNodeId] = useState<string | null>(null);
   const [imagePaddingValue, setImagePaddingValue] = useState<string>("");
   const [dragging, setDragging] = useState(false);
   const [codeMapMapping, setCodeMapMapping] = useState<CodeMapMapping | null>(null);
@@ -519,6 +532,9 @@ const loadDiagram = useCallback(
       );
       setSelectedEdgeId((current) =>
         current && data.edges.some((edge) => edge.id === current) ? current : null
+      );
+      setConnectSourceNodeId((current) =>
+        current && data.nodes.some((node) => node.id === current) ? current : null
       );
       return data;
     } catch (err) {
@@ -1107,6 +1123,100 @@ const handleSelectEdge = useCallback((id: string | null) => {
   }
 }, []);
 
+const handleAddNode = useCallback(async () => {
+  if (!diagram || diagram.kind !== "flowchart" || saving || sourceSaving) {
+    return;
+  }
+
+  const label = window.prompt("Node label", "New node");
+  if (label === null) {
+    return;
+  }
+
+  const id = generateUnusedNodeId(diagram.nodes);
+  const trimmedLabel = label.trim();
+  try {
+    setSaving(true);
+    setError(null);
+    const changed = await addNode({
+      id,
+      label: trimmedLabel || id,
+      shape: "rectangle",
+    });
+    if (!changed) {
+      setError(`Node already exists: ${id}`);
+      return;
+    }
+    setSelectedNodeId(id);
+    setSelectedEdgeId(null);
+    await loadDiagram({ silent: true });
+  } catch (err) {
+    setError((err as Error).message);
+  } finally {
+    setSaving(false);
+  }
+}, [diagram, loadDiagram, saving, sourceSaving]);
+
+const handleToggleConnectMode = useCallback(() => {
+  if (!diagram || diagram.kind !== "flowchart" || saving || sourceSaving) {
+    return;
+  }
+  setConnectMode((current) => !current);
+  setConnectSourceNodeId(null);
+  setSelectedEdgeId(null);
+}, [diagram, saving, sourceSaving]);
+
+const handleConnectNodeClick = useCallback(
+  async (nodeId: string) => {
+    if (!connectMode || !diagram || diagram.kind !== "flowchart" || saving || sourceSaving) {
+      return;
+    }
+
+    if (!connectSourceNodeId) {
+      setConnectSourceNodeId(nodeId);
+      setSelectedNodeId(nodeId);
+      setSelectedEdgeId(null);
+      return;
+    }
+
+    if (connectSourceNodeId === nodeId) {
+      setConnectSourceNodeId(null);
+      return;
+    }
+
+    const label = window.prompt("Edge label (optional)", "");
+    if (label === null) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      setError(null);
+      const changed = await addEdge({
+        from: connectSourceNodeId,
+        to: nodeId,
+        label: label.trim() || undefined,
+        kind: "solid",
+        arrow: "forward",
+      });
+      if (!changed) {
+        setError(`Edge already exists: ${connectSourceNodeId} --> ${nodeId}`);
+        return;
+      }
+      setSelectedNodeId(null);
+      setSelectedEdgeId(`${connectSourceNodeId} --> ${nodeId}`);
+      setConnectMode(false);
+      setConnectSourceNodeId(null);
+      await loadDiagram({ silent: true });
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  },
+  [connectMode, connectSourceNodeId, diagram, loadDiagram, saving, sourceSaving]
+);
+
 const deleteTarget = useCallback(
   async (target: { type: "node" | "edge"; id: string }) => {
     if (saving || sourceSaving) {
@@ -1118,6 +1228,8 @@ const deleteTarget = useCallback(
       if (target.type === "node") {
         await deleteNode(target.id);
         setSelectedNodeId((current) => (current === target.id ? null : current));
+        setConnectSourceNodeId((current) => (current === target.id ? null : current));
+        setConnectMode((current) => (connectSourceNodeId === target.id ? false : current));
         setSelectedEdgeId(null);
       } else {
         await deleteEdge(target.id);
@@ -1130,7 +1242,7 @@ const deleteTarget = useCallback(
       setSaving(false);
     }
   },
-  [deleteEdge, deleteNode, loadDiagram, saving, sourceSaving]
+  [connectSourceNodeId, deleteEdge, deleteNode, loadDiagram, saving, sourceSaving]
 );
 
   const resolveCodeMapPathCandidates = useCallback((rawTarget: string) => {
@@ -1411,8 +1523,13 @@ const statusMessage = useMemo(() => {
   if (error) {
     return `Error: ${error}`;
   }
+  if (connectMode) {
+    return connectSourceNodeId
+      ? `Connect from ${connectSourceNodeId}: choose a target node`
+      : "Connect nodes: choose a source node";
+  }
   return diagram ? `Editing ${diagram.sourcePath}` : "No diagram selected";
-}, [diagram, downloadingPng, error, loading, saving, shareCopied, sharingLink, sourceSaving]);
+}, [connectMode, connectSourceNodeId, diagram, downloadingPng, error, loading, saving, shareCopied, sharingLink, sourceSaving]);
 
 useEffect(() => {
   if (!diagram || dragging) {
@@ -1492,6 +1609,7 @@ const selectionLabel = useMemo(() => {
 }, [selectedEdgeId, selectedNodeId]);
 
 const hasSelection = selectedNodeId !== null || selectedEdgeId !== null;
+const canEditStructure = diagram?.kind === "flowchart" && !codedownMode;
 const ganttStyle = diagram?.kind === "gantt" ? diagram.gantt?.style : null;
 
 const nodeFillValue = useMemo(() => {
@@ -1671,6 +1789,21 @@ return (
           title="Remove all manual positions"
         >
           Reset overrides
+        </button>
+        <button
+          onClick={() => void handleAddNode()}
+          disabled={!canEditStructure || saving || sourceSaving}
+          title="Add a new rectangle node"
+        >
+          Add node
+        </button>
+        <button
+          className={connectMode ? "active" : undefined}
+          onClick={handleToggleConnectMode}
+          disabled={!canEditStructure || saving || sourceSaving}
+          title="Connect two existing nodes"
+        >
+          Connect nodes
         </button>
         <button
           onClick={() => void handleDeleteSelection()}
@@ -2014,8 +2147,11 @@ return (
                 onSvgMarkupChange={setSvgMarkup}
                 selectedNodeId={selectedNodeId}
                 selectedEdgeId={selectedEdgeId}
+                connectMode={connectMode}
+                connectSourceNodeId={connectSourceNodeId}
                 onSelectNode={handleSelectNode}
                 onSelectEdge={handleSelectEdge}
+                onConnectNodeClick={handleConnectNodeClick}
                 onDragStateChange={setDragging}
                 onDeleteNode={handleDeleteNodeDirect}
                 onDeleteEdge={handleDeleteEdgeDirect}

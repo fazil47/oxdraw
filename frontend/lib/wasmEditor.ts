@@ -19,6 +19,8 @@ export interface WasmEditorCore {
   applyLayoutUpdate(update: unknown): void;
   applyStyleUpdate(update: unknown): void;
   setSource(source: string): void;
+  addNode(input: unknown): boolean;
+  addEdge(input: unknown): boolean;
   deleteNode(id: string): boolean;
   deleteEdge(id: string): boolean;
 }

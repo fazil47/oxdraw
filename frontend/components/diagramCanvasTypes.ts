@@ -10,8 +10,11 @@ export interface DiagramCanvasProps {
   onSvgMarkupChange?: (markup: string) => void;
   selectedNodeId: string | null;
   selectedEdgeId: string | null;
+  connectMode?: boolean;
+  connectSourceNodeId?: string | null;
   onSelectNode: (id: string | null) => void;
   onSelectEdge: (id: string | null) => void;
+  onConnectNodeClick?: (id: string) => void;
   onDragStateChange?: (dragging: boolean) => void;
   onDeleteNode: (id: string) => Promise<void> | void;
   onDeleteEdge: (id: string) => Promise<void> | void;

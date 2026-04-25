@@ -145,8 +145,10 @@ pub struct NodeImage {
     pub padding: f32,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum NodeShape {
+    #[default]
     Rectangle,
     Stadium,
     Circle,
@@ -171,18 +173,53 @@ pub struct Edge {
     pub arrow: EdgeArrowDirection,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AddNodeInput {
+    pub id: String,
+    #[serde(default)]
+    pub label: Option<String>,
+    #[serde(default)]
+    pub shape: NodeShape,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AddEdgeInput {
+    pub from: String,
+    pub to: String,
+    #[serde(default)]
+    pub label: Option<String>,
+    #[serde(default)]
+    pub kind: EdgeKind,
+    #[serde(default)]
+    pub arrow: EdgeArrowDirection,
+}
+
+impl Default for AddEdgeInput {
+    fn default() -> Self {
+        Self {
+            from: String::new(),
+            to: String::new(),
+            label: None,
+            kind: EdgeKind::Solid,
+            arrow: EdgeArrowDirection::Forward,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum EdgeKind {
+    #[default]
     Solid,
     Dashed,
     Thick,
     Invisible,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum EdgeArrowDirection {
+    #[default]
     Forward,
     Backward,
     Both,
@@ -300,12 +337,6 @@ impl GanttStyleOverride {
 impl GanttOverrides {
     pub fn is_empty(&self) -> bool {
         self.tasks.is_empty() && self.style.is_empty()
-    }
-}
-
-impl Default for EdgeArrowDirection {
-    fn default() -> Self {
-        EdgeArrowDirection::Forward
     }
 }
 

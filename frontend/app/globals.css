@@ -100,6 +100,11 @@ body > div:first-of-type {
   box-shadow: 0 4px 12px var(--shadow-color);
 }
 
+.toolbar button.active {
+  background: var(--accent-hover);
+  box-shadow: inset 0 0 0 2px var(--accent-text);
+}
+
 .workspace {
   flex: 1;
   display: flex;
@@ -129,6 +134,10 @@ body > div:first-of-type {
 .diagram-canvas svg {
   display: block;
   max-width: none;
+}
+
+.diagram-canvas.connect-mode .node {
+  cursor: crosshair;
 }
 
 .placeholder {
@@ -229,6 +238,15 @@ body > div:first-of-type {
 .node.selected line {
   stroke: #f472b6;
   filter: drop-shadow(0 16px 30px rgba(236, 72, 153, 0.2));
+}
+
+.node.connect-source rect,
+.node.connect-source ellipse,
+.node.connect-source polygon,
+.node.connect-source path,
+.node.connect-source line {
+  stroke: #2563eb;
+  filter: drop-shadow(0 16px 30px rgba(37, 99, 235, 0.2));
 }
 
 .node:hover rect,

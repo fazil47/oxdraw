@@ -27,6 +27,8 @@ export class WasmEditorCore {
   updateGanttTaskDrag(pointer_x: number): void;
   constructor(source: string, background: string);
   source(): string;
+  addEdge(input: any): boolean;
+  addNode(input: any): boolean;
 }
 
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
@@ -34,6 +36,8 @@ export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembl
 export interface InitOutput {
   readonly memory: WebAssembly.Memory;
   readonly __wbg_wasmeditorcore_free: (a: number, b: number) => void;
+  readonly wasmeditorcore_addEdge: (a: number, b: any) => [number, number, number];
+  readonly wasmeditorcore_addNode: (a: number, b: any) => [number, number, number];
   readonly wasmeditorcore_applyLayoutUpdate: (a: number, b: any) => [number, number];
   readonly wasmeditorcore_applyStyleUpdate: (a: number, b: any) => [number, number];
   readonly wasmeditorcore_beginEdgeDrag: (a: number, b: number, c: number, d: number) => [number, number];

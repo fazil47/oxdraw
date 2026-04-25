@@ -1,5 +1,5 @@
 use anyhow::Result;
-use oxdraw::Diagram;
+use oxdraw::{AddEdgeInput, AddNodeInput, Diagram, EdgeArrowDirection, EdgeKind, EditorCore};
 
 #[test]
 fn diagram_parse_and_render_svg() -> Result<()> {
@@ -66,6 +66,96 @@ fn diagram_parses_image_comments() -> Result<()> {
         svg.contains("data:image/png;base64,"),
         "rendered svg should contain a data URI for the embedded image"
     );
+
+    Ok(())
+}
+
+#[test]
+fn diagram_adds_node_to_flowchart_definition() -> Result<()> {
+    let mut diagram = Diagram::parse("graph TD\n    A[Start]\n")?;
+
+    let changed = diagram.add_node(AddNodeInput {
+        id: "B".to_string(),
+        label: Some("Next".to_string()),
+        ..Default::default()
+    })?;
+
+    assert!(changed);
+    assert!(diagram.nodes.contains_key("B"));
+    assert!(diagram.to_definition().contains("B[Next]"));
+    Ok(())
+}
+
+#[test]
+fn diagram_rejects_duplicate_node_id() -> Result<()> {
+    let mut diagram = Diagram::parse("graph TD\n    A[Start]\n")?;
+
+    let changed = diagram.add_node(AddNodeInput {
+        id: "A".to_string(),
+        label: Some("Duplicate".to_string()),
+        ..Default::default()
+    })?;
+
+    assert!(!changed);
+    assert_eq!(diagram.nodes["A"].label, "Start");
+    Ok(())
+}
+
+#[test]
+fn diagram_adds_edge_between_existing_nodes() -> Result<()> {
+    let mut diagram = Diagram::parse("graph TD\n    A[Start]\n    B[End]\n")?;
+
+    let changed = diagram.add_edge(AddEdgeInput {
+        from: "A".to_string(),
+        to: "B".to_string(),
+        label: Some("go".to_string()),
+        kind: EdgeKind::Solid,
+        arrow: EdgeArrowDirection::Forward,
+    })?;
+
+    assert!(changed);
+    let definition = diagram.to_definition();
+    assert!(definition.contains("A -->|go| B"));
+    let reparsed = Diagram::parse(&definition)?;
+    assert_eq!(reparsed.edges.len(), 1);
+    Ok(())
+}
+
+#[test]
+fn diagram_rejects_edge_with_missing_endpoint() -> Result<()> {
+    let mut diagram = Diagram::parse("graph TD\n    A[Start]\n")?;
+
+    let err = diagram
+        .add_edge(AddEdgeInput {
+            from: "A".to_string(),
+            to: "Missing".to_string(),
+            ..Default::default()
+        })
+        .expect_err("missing endpoint should fail");
+
+    assert!(err.to_string().contains("target node 'Missing' not found"));
+    Ok(())
+}
+
+#[test]
+fn editor_core_adds_then_deletes_node_and_edge() -> Result<()> {
+    let mut core = EditorCore::from_source("graph TD\n    A[Start]\n", "white")?;
+
+    assert!(core.add_node(AddNodeInput {
+        id: "B".to_string(),
+        label: Some("End".to_string()),
+        ..Default::default()
+    })?);
+    assert!(core.add_edge(AddEdgeInput {
+        from: "A".to_string(),
+        to: "B".to_string(),
+        ..Default::default()
+    })?);
+    assert!(core.source()?.contains("A --> B"));
+
+    assert!(core.delete_edge("A --> B")?);
+    assert!(core.delete_node("B")?);
+    assert!(!core.source()?.contains("B[End]"));
 
     Ok(())
 }

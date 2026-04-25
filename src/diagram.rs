@@ -2210,6 +2210,60 @@ impl Diagram {
         before != self.edges.len()
     }
 
+    pub fn add_node(&mut self, input: AddNodeInput) -> Result<bool> {
+        ensure_flowchart(&self.kind)?;
+        let id = normalize_node_id(&input.id)?;
+        if self.nodes.contains_key(&id) {
+            return Ok(false);
+        }
+
+        let label = normalize_node_label(input.label.as_deref(), &id)?;
+        let (width, height) = compute_node_dimensions(input.shape, &label);
+        self.nodes.insert(
+            id.clone(),
+            Node {
+                label,
+                shape: input.shape,
+                image: None,
+                width,
+                height,
+            },
+        );
+        self.order.push(id.clone());
+        self.node_membership.insert(id, Vec::new());
+        Ok(true)
+    }
+
+    pub fn add_edge(&mut self, input: AddEdgeInput) -> Result<bool> {
+        ensure_flowchart(&self.kind)?;
+        let from = input.from.trim();
+        let to = input.to.trim();
+        if !self.nodes.contains_key(from) {
+            bail!("source node '{from}' not found");
+        }
+        if !self.nodes.contains_key(to) {
+            bail!("target node '{to}' not found");
+        }
+
+        let edge = Edge {
+            from: from.to_string(),
+            to: to.to_string(),
+            label: normalize_edge_label(input.label.as_deref())?,
+            kind: input.kind,
+            arrow: input.arrow,
+        };
+        let edge_id = edge_identifier(&edge);
+        if self
+            .edges
+            .iter()
+            .any(|edge| edge_identifier(edge) == edge_id)
+        {
+            return Ok(false);
+        }
+        self.edges.push(edge);
+        Ok(true)
+    }
+
     pub fn to_definition(&self) -> String {
         if let DiagramKind::Gantt(gantt) = &self.kind {
             let mut source = gantt.original_source.clone();
@@ -4276,6 +4330,51 @@ pub fn edge_identifier(edge: &Edge) -> String {
         edge.kind.connector(edge.arrow),
         edge.to
     )
+}
+
+fn ensure_flowchart(kind: &DiagramKind) -> Result<()> {
+    if matches!(kind, DiagramKind::Flowchart) {
+        Ok(())
+    } else {
+        bail!("structural node and edge edits are only supported for flowcharts")
+    }
+}
+
+fn normalize_node_id(raw: &str) -> Result<String> {
+    let id = raw.trim();
+    if id.is_empty() {
+        bail!("node identifier cannot be empty");
+    }
+    if !id
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-'))
+    {
+        bail!("node identifier '{id}' must use only ASCII letters, numbers, '_' or '-'");
+    }
+    Ok(id.to_string())
+}
+
+fn normalize_node_label(raw: Option<&str>, fallback: &str) -> Result<String> {
+    let Some(label) = raw.map(str::trim).filter(|label| !label.is_empty()) else {
+        return Ok(fallback.to_string());
+    };
+    if label.contains('\n') || label.contains('\r') {
+        bail!("node label cannot contain line breaks");
+    }
+    Ok(label.to_string())
+}
+
+fn normalize_edge_label(raw: Option<&str>) -> Result<Option<String>> {
+    let Some(label) = raw.map(str::trim).filter(|label| !label.is_empty()) else {
+        return Ok(None);
+    };
+    if label.contains('\n') || label.contains('\r') {
+        bail!("edge label cannot contain line breaks");
+    }
+    if label.contains('|') {
+        bail!("edge label cannot contain '|'");
+    }
+    Ok(Some(label.to_string()))
 }
 
 fn parse_graph_header(line: &str) -> Result<Direction> {

@@ -487,6 +487,28 @@ export class WasmEditorCore {
             wasm.__wbindgen_free(deferred2_0, deferred2_1, 1);
         }
     }
+    /**
+     * @param {any} input
+     * @returns {boolean}
+     */
+    addEdge(input) {
+        const ret = wasm.wasmeditorcore_addEdge(this.__wbg_ptr, input);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return ret[0] !== 0;
+    }
+    /**
+     * @param {any} input
+     * @returns {boolean}
+     */
+    addNode(input) {
+        const ret = wasm.wasmeditorcore_addNode(this.__wbg_ptr, input);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return ret[0] !== 0;
+    }
 }
 if (Symbol.dispose) WasmEditorCore.prototype[Symbol.dispose] = WasmEditorCore.prototype.free;
 

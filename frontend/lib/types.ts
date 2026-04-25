@@ -160,6 +160,20 @@ export interface StyleUpdate {
   };
 }
 
+export interface AddNodeInput {
+  id: string;
+  label?: string;
+  shape?: NodeShape;
+}
+
+export interface AddEdgeInput {
+  from: string;
+  to: string;
+  label?: string;
+  kind?: EdgeKind;
+  arrow?: EdgeArrowDirection;
+}
+
 export interface SearchResult {
   file: string;
   line: number;

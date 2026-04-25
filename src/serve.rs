@@ -10,7 +10,7 @@ use axum::http::StatusCode;
 use axum::http::{HeaderValue, header};
 use axum::response::IntoResponse;
 use axum::response::Response;
-use axum::routing::{delete, get, put};
+use axum::routing::{delete, get, post, put};
 use axum::{Json, Router};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
@@ -227,6 +227,12 @@ struct GanttTaskLayoutUpdate {
 #[derive(Debug, Deserialize)]
 struct SourceUpdateRequest {
     source: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct MutationResponse {
+    changed: bool,
 }
 
 #[derive(Debug, Deserialize, Default)]
@@ -577,6 +583,48 @@ impl ServeState {
         Ok(true)
     }
 
+    async fn add_node(&self, input: AddNodeInput) -> Result<bool> {
+        let diagram = {
+            let _guard = self.source_lock.lock().await;
+            let source = tokio::fs::read_to_string(&self.source_path)
+                .await
+                .with_context(|| format!("failed to read '{}'", self.source_path.display()))?;
+            let mut diagram = Diagram::parse(&source)?;
+            if !diagram.add_node(input)? {
+                return Ok(false);
+            }
+            let rewritten = diagram.to_definition();
+            tokio::fs::write(&self.source_path, rewritten.as_bytes())
+                .await
+                .with_context(|| format!("failed to write '{}'", self.source_path.display()))?;
+            diagram
+        };
+
+        self.prune_overrides_for(&diagram).await?;
+        Ok(true)
+    }
+
+    async fn add_edge(&self, input: AddEdgeInput) -> Result<bool> {
+        let diagram = {
+            let _guard = self.source_lock.lock().await;
+            let source = tokio::fs::read_to_string(&self.source_path)
+                .await
+                .with_context(|| format!("failed to read '{}'", self.source_path.display()))?;
+            let mut diagram = Diagram::parse(&source)?;
+            if !diagram.add_edge(input)? {
+                return Ok(false);
+            }
+            let rewritten = diagram.to_definition();
+            tokio::fs::write(&self.source_path, rewritten.as_bytes())
+                .await
+                .with_context(|| format!("failed to write '{}'", self.source_path.display()))?;
+            diagram
+        };
+
+        self.prune_overrides_for(&diagram).await?;
+        Ok(true)
+    }
+
     async fn remove_edge(&self, edge_id: &str) -> Result<bool> {
         let diagram = {
             let _guard = self.source_lock.lock().await;
@@ -729,6 +777,8 @@ pub async fn run_serve(args: ServeArgs, ui_root: Option<PathBuf>) -> Result<()> 
         .route("/api/diagram/layout", put(put_layout))
         .route("/api/diagram/style", put(put_style))
         .route("/api/diagram/source", get(get_source).put(put_source))
+        .route("/api/diagram/nodes", post(post_node))
+        .route("/api/diagram/edges", post(post_edge))
         .route("/api/diagram/nodes/:id/image", put(put_node_image))
         .route("/api/diagram/nodes/:id", delete(delete_node))
         .route("/api/diagram/edges/:id", delete(delete_edge))
@@ -1080,6 +1130,26 @@ async fn put_source(
         .await
         .map_err(internal_error)?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+async fn post_node(
+    State(state): State<Arc<ServeState>>,
+    Json(payload): Json<AddNodeInput>,
+) -> Result<Json<MutationResponse>, (StatusCode, String)> {
+    match state.add_node(payload).await {
+        Ok(changed) => Ok(Json(MutationResponse { changed })),
+        Err(err) => Err((StatusCode::BAD_REQUEST, err.to_string())),
+    }
+}
+
+async fn post_edge(
+    State(state): State<Arc<ServeState>>,
+    Json(payload): Json<AddEdgeInput>,
+) -> Result<Json<MutationResponse>, (StatusCode, String)> {
+    match state.add_edge(payload).await {
+        Ok(changed) => Ok(Json(MutationResponse { changed })),
+        Err(err) => Err((StatusCode::BAD_REQUEST, err.to_string())),
+    }
 }
 
 async fn delete_node(

@@ -1,4 +1,6 @@
 import {
+  AddEdgeInput,
+  AddNodeInput,
   DiagramData,
   EdgeStyleUpdate,
   LayoutUpdate,
@@ -581,6 +583,60 @@ export async function deleteNode(nodeId: string): Promise<void> {
     const message = await response.text();
     throw new Error(message || `Failed to delete node: ${response.status}`);
   }
+}
+
+export async function addNode(input: AddNodeInput): Promise<boolean> {
+  if (MODE === "local") {
+    const core = await ensureLocalCore();
+    const changed = core.addNode(input);
+    if (changed) {
+      persistLocalCore(core);
+    }
+    return changed;
+  }
+
+  const response = await fetch(`${API_BASE}/api/diagram/nodes`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || `Failed to add node: ${response.status}`);
+  }
+
+  const payload = (await response.json()) as { changed?: boolean };
+  return payload.changed ?? false;
+}
+
+export async function addEdge(input: AddEdgeInput): Promise<boolean> {
+  if (MODE === "local") {
+    const core = await ensureLocalCore();
+    const changed = core.addEdge(input);
+    if (changed) {
+      persistLocalCore(core);
+    }
+    return changed;
+  }
+
+  const response = await fetch(`${API_BASE}/api/diagram/edges`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(input),
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || `Failed to add edge: ${response.status}`);
+  }
+
+  const payload = (await response.json()) as { changed?: boolean };
+  return payload.changed ?? false;
 }
 
 export async function deleteEdge(edgeId: string): Promise<void> {

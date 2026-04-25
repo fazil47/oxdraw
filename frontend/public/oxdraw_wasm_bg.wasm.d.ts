@@ -2,6 +2,8 @@
 /* eslint-disable */
 export const memory: WebAssembly.Memory;
 export const __wbg_wasmeditorcore_free: (a: number, b: number) => void;
+export const wasmeditorcore_addEdge: (a: number, b: any) => [number, number, number];
+export const wasmeditorcore_addNode: (a: number, b: any) => [number, number, number];
 export const wasmeditorcore_applyLayoutUpdate: (a: number, b: any) => [number, number];
 export const wasmeditorcore_applyStyleUpdate: (a: number, b: any) => [number, number];
 export const wasmeditorcore_beginEdgeDrag: (a: number, b: number, c: number, d: number) => [number, number];

@@ -4,7 +4,10 @@ use std::collections::{HashMap, HashSet};
 
 use crate::diagram::{LayoutOverrides, Point, align_geometry, edge_identifier};
 use crate::utils::split_source_and_overrides;
-use crate::{CanvasSize, Diagram, DiagramKind, EdgeArrowDirection, EdgeKind, EdgeOverride};
+use crate::{
+    AddEdgeInput, AddNodeInput, CanvasSize, Diagram, DiagramKind, EdgeArrowDirection, EdgeKind,
+    EdgeOverride,
+};
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -1096,6 +1099,32 @@ impl EditorCore {
         Ok(true)
     }
 
+    pub fn add_node(&mut self, input: AddNodeInput) -> Result<bool> {
+        let mut diagram = Diagram::parse(&self.definition)?;
+        if !diagram.add_node(input)? {
+            return Ok(false);
+        }
+        self.definition = diagram.to_definition();
+        let node_ids: HashSet<String> = diagram.nodes.keys().cloned().collect();
+        let edge_ids: HashSet<String> = diagram.edges.iter().map(edge_identifier).collect();
+        self.overrides.prune(&node_ids, &edge_ids);
+        self.drag_state = None;
+        Ok(true)
+    }
+
+    pub fn add_edge(&mut self, input: AddEdgeInput) -> Result<bool> {
+        let mut diagram = Diagram::parse(&self.definition)?;
+        if !diagram.add_edge(input)? {
+            return Ok(false);
+        }
+        self.definition = diagram.to_definition();
+        let node_ids: HashSet<String> = diagram.nodes.keys().cloned().collect();
+        let edge_ids: HashSet<String> = diagram.edges.iter().map(edge_identifier).collect();
+        self.overrides.prune(&node_ids, &edge_ids);
+        self.drag_state = None;
+        Ok(true)
+    }
+
     pub fn delete_edge(&mut self, id: &str) -> Result<bool> {
         let mut diagram = Diagram::parse(&self.definition)?;
         if !diagram.remove_edge_by_identifier(id) {
@@ -1427,6 +1456,18 @@ mod wasm {
         #[wasm_bindgen(js_name = source)]
         pub fn source(&self) -> Result<String, JsValue> {
             self.inner.borrow().source().map_err(to_js_error)
+        }
+
+        #[wasm_bindgen(js_name = addNode)]
+        pub fn add_node(&self, input: JsValue) -> Result<bool, JsValue> {
+            let input: AddNodeInput = serde_wasm_bindgen::from_value(input).map_err(to_js_error)?;
+            self.inner.borrow_mut().add_node(input).map_err(to_js_error)
+        }
+
+        #[wasm_bindgen(js_name = addEdge)]
+        pub fn add_edge(&self, input: JsValue) -> Result<bool, JsValue> {
+            let input: AddEdgeInput = serde_wasm_bindgen::from_value(input).map_err(to_js_error)?;
+            self.inner.borrow_mut().add_edge(input).map_err(to_js_error)
         }
 
         #[wasm_bindgen(js_name = deleteNode)]

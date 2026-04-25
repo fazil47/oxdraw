@@ -149,8 +149,12 @@ export default function WasmDiagramCanvas({
   onLayoutUpdate,
   onSvgMarkupChange,
   selectedNodeId,
+  selectedEdgeId,
+  connectMode = false,
+  connectSourceNodeId = null,
   onSelectNode,
   onSelectEdge,
+  onConnectNodeClick,
   onDragStateChange,
 }: DiagramCanvasProps) {
   const wrapperRef = useRef<HTMLDivElement | null>(null);
@@ -208,6 +212,22 @@ export default function WasmDiagramCanvas({
       cancelled = true;
     };
   }, [diagram.background, diagram.source, onSvgMarkupChange]);
+
+  useEffect(() => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper) {
+      return;
+    }
+    for (const node of Array.from(wrapper.querySelectorAll("g.node[data-id]"))) {
+      const id = node.getAttribute("data-id");
+      node.classList.toggle("selected", id === selectedNodeId);
+      node.classList.toggle("connect-source", id === connectSourceNodeId);
+    }
+    for (const edge of Array.from(wrapper.querySelectorAll("g.edge[data-id]"))) {
+      const id = edge.getAttribute("data-id");
+      edge.classList.toggle("selected", id === selectedEdgeId);
+    }
+  }, [connectSourceNodeId, selectedEdgeId, selectedNodeId, svgMarkup]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -313,6 +333,11 @@ export default function WasmDiagramCanvas({
     if (nodeGroup) {
       const nodeId = nodeGroup.getAttribute("data-id");
       if (!nodeId) {
+        return;
+      }
+      if (connectMode) {
+        onConnectNodeClick?.(nodeId);
+        event.preventDefault();
         return;
       }
       onSelectEdge(null);
@@ -475,7 +500,7 @@ export default function WasmDiagramCanvas({
   return (
     <div
       ref={wrapperRef}
-      className="diagram-canvas"
+      className={`diagram-canvas${connectMode ? " connect-mode" : ""}`}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
