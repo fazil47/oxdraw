@@ -848,7 +848,12 @@ pub async fn run_serve(args: ServeArgs, ui_root: Option<PathBuf>) -> Result<()> 
             let svc = dir_for_service.clone();
             async move {
                 match svc.oneshot(req).await {
-                    Ok(response) => Ok(response.map(axum::body::Body::new)),
+                    Ok(mut response) => {
+                        response
+                            .headers_mut()
+                            .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+                        Ok(response.map(axum::body::Body::new))
+                    }
                     Err(error) => {
                         let message = format!("Static file error: {error}");
                         Ok((StatusCode::INTERNAL_SERVER_ERROR, message).into_response())
