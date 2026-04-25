@@ -2234,6 +2234,22 @@ impl Diagram {
         Ok(true)
     }
 
+    pub fn rename_node(&mut self, node_id: &str, label: Option<&str>) -> Result<bool> {
+        ensure_flowchart(&self.kind)?;
+        let Some(node) = self.nodes.get_mut(node_id) else {
+            return Ok(false);
+        };
+        let label = normalize_node_label(label, node_id)?;
+        if node.label == label {
+            return Ok(false);
+        }
+        let (width, height) = compute_node_dimensions(node.shape, &label);
+        node.label = label;
+        node.width = width;
+        node.height = height;
+        Ok(true)
+    }
+
     pub fn add_edge(&mut self, input: AddEdgeInput) -> Result<bool> {
         ensure_flowchart(&self.kind)?;
         let from = input.from.trim();
@@ -2261,6 +2277,23 @@ impl Diagram {
             return Ok(false);
         }
         self.edges.push(edge);
+        Ok(true)
+    }
+
+    pub fn rename_edge(&mut self, edge_id: &str, label: Option<&str>) -> Result<bool> {
+        ensure_flowchart(&self.kind)?;
+        let Some(edge) = self
+            .edges
+            .iter_mut()
+            .find(|edge| edge_identifier(edge) == edge_id)
+        else {
+            return Ok(false);
+        };
+        let label = normalize_edge_label(label)?;
+        if edge.label == label {
+            return Ok(false);
+        }
+        edge.label = label;
         Ok(true)
     }
 

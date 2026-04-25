@@ -10,6 +10,8 @@ export class WasmEditorCore {
   cancelDrag(): void;
   deleteEdge(id: string): boolean;
   deleteNode(id: string): boolean;
+  renameEdge(id: string, input: any): boolean;
+  renameNode(id: string, input: any): boolean;
   endEdgeDrag(): any;
   endNodeDrag(): any;
   setBackground(background: string): void;
@@ -53,6 +55,8 @@ export interface InitOutput {
   readonly wasmeditorcore_endSubgraphDrag: (a: number) => [number, number, number];
   readonly wasmeditorcore_new: (a: number, b: number, c: number, d: number) => [number, number, number];
   readonly wasmeditorcore_nudgeNode: (a: number, b: number, c: number, d: number, e: number) => [number, number, number];
+  readonly wasmeditorcore_renameEdge: (a: number, b: number, c: number, d: any) => [number, number, number];
+  readonly wasmeditorcore_renameNode: (a: number, b: number, c: number, d: any) => [number, number, number];
   readonly wasmeditorcore_renderSvg: (a: number) => [number, number, number, number];
   readonly wasmeditorcore_setBackground: (a: number, b: number, c: number) => void;
   readonly wasmeditorcore_setSource: (a: number, b: number, c: number) => [number, number];

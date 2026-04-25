@@ -22,6 +22,8 @@ import {
   isLocalMode,
   updateLayout,
   updateNodeImage,
+  updateEdgeLabel,
+  updateNodeLabel,
   updateSource,
   updateStyle,
   fetchCodeMapMapping,
@@ -390,6 +392,8 @@ export default function Home() {
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [connectMode, setConnectMode] = useState(false);
   const [connectSourceNodeId, setConnectSourceNodeId] = useState<string | null>(null);
+  const [nodeLabelDraft, setNodeLabelDraft] = useState("");
+  const [edgeLabelDraft, setEdgeLabelDraft] = useState("");
   const [imagePaddingValue, setImagePaddingValue] = useState<string>("");
   const [dragging, setDragging] = useState(false);
   const [codeMapMapping, setCodeMapMapping] = useState<CodeMapMapping | null>(null);
@@ -493,6 +497,14 @@ useEffect(() => {
     setImagePaddingValue("");
   }
 }, [selectedNode?.id, selectedNode?.image?.padding]);
+
+useEffect(() => {
+  setNodeLabelDraft(selectedNode?.label ?? "");
+}, [selectedNode?.id, selectedNode?.label]);
+
+useEffect(() => {
+  setEdgeLabelDraft(selectedEdge?.label ?? "");
+}, [selectedEdge?.id, selectedEdge?.label]);
 
 useEffect(() => {
   imagePaddingValueRef.current = imagePaddingValue;
@@ -1123,6 +1135,85 @@ const handleSelectEdge = useCallback((id: string | null) => {
   }
 }, []);
 
+const commitNodeLabel = useCallback(async () => {
+  if (!selectedNode || saving || sourceSaving) {
+    return;
+  }
+  const nextLabel = nodeLabelDraft.trim() || selectedNode.id;
+  if (nextLabel === selectedNode.label) {
+    setNodeLabelDraft(selectedNode.label);
+    return;
+  }
+
+  try {
+    setSaving(true);
+    setError(null);
+    await updateNodeLabel(selectedNode.id, { label: nextLabel });
+    setNodeLabelDraft(nextLabel);
+    await loadDiagram({ silent: true });
+  } catch (err) {
+    setError((err as Error).message);
+    setNodeLabelDraft(selectedNode.label);
+  } finally {
+    setSaving(false);
+  }
+}, [loadDiagram, nodeLabelDraft, saving, selectedNode, sourceSaving]);
+
+const commitEdgeLabel = useCallback(async () => {
+  if (!selectedEdge || saving || sourceSaving) {
+    return;
+  }
+  const nextLabel = edgeLabelDraft.trim();
+  const normalizedLabel = nextLabel || undefined;
+  if ((normalizedLabel ?? "") === (selectedEdge.label ?? "")) {
+    setEdgeLabelDraft(selectedEdge.label ?? "");
+    return;
+  }
+
+  try {
+    setSaving(true);
+    setError(null);
+    await updateEdgeLabel(selectedEdge.id, { label: normalizedLabel });
+    setEdgeLabelDraft(normalizedLabel ?? "");
+    await loadDiagram({ silent: true });
+  } catch (err) {
+    setError((err as Error).message);
+    setEdgeLabelDraft(selectedEdge.label ?? "");
+  } finally {
+    setSaving(false);
+  }
+}, [edgeLabelDraft, loadDiagram, saving, selectedEdge, sourceSaving]);
+
+const handleNodeLabelKeyDown = useCallback(
+  (event: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      void commitNodeLabel();
+      event.currentTarget.blur();
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      setNodeLabelDraft(selectedNode?.label ?? "");
+      event.currentTarget.blur();
+    }
+  },
+  [commitNodeLabel, selectedNode]
+);
+
+const handleEdgeLabelKeyDown = useCallback(
+  (event: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      void commitEdgeLabel();
+      event.currentTarget.blur();
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      setEdgeLabelDraft(selectedEdge?.label ?? "");
+      event.currentTarget.blur();
+    }
+  },
+  [commitEdgeLabel, selectedEdge]
+);
+
 const handleAddNode = useCallback(async () => {
   if (!diagram || diagram.kind !== "flowchart" || saving || sourceSaving) {
     return;
@@ -1696,8 +1787,8 @@ const edgeColorValue = useMemo(() => {
 const edgeLineValue = selectedEdge?.kind ?? "solid";
 const edgeArrowValue = selectedEdge?.arrowDirection ?? "forward";
 
-const nodeControlsDisabled = !selectedNode || saving;
-const edgeControlsDisabled = !selectedEdge || saving;
+const nodeControlsDisabled = !selectedNode || saving || sourceSaving;
+const edgeControlsDisabled = !selectedEdge || saving || sourceSaving;
 
 useEffect(() => {
   const handleKeyDown = (event: KeyboardEvent) => {
@@ -1925,6 +2016,17 @@ return (
                     </span>
                   </header>
                   <div className="style-controls" aria-disabled={nodeControlsDisabled}>
+                    <label className="style-control label-control">
+                      <span>Label</span>
+                      <input
+                        type="text"
+                        value={nodeLabelDraft}
+                        onChange={(event) => setNodeLabelDraft(event.target.value)}
+                        onBlur={() => void commitNodeLabel()}
+                        onKeyDown={handleNodeLabelKeyDown}
+                        disabled={nodeControlsDisabled}
+                      />
+                    </label>
                     <div className="style-color-row">
                       {!selectedNode?.image ? (
                         <label className="style-control">
@@ -2074,6 +2176,17 @@ return (
                     </span>
                   </header>
                   <div className="style-controls" aria-disabled={edgeControlsDisabled}>
+                    <label className="style-control label-control">
+                      <span>Label</span>
+                      <input
+                        type="text"
+                        value={edgeLabelDraft}
+                        onChange={(event) => setEdgeLabelDraft(event.target.value)}
+                        onBlur={() => void commitEdgeLabel()}
+                        onKeyDown={handleEdgeLabelKeyDown}
+                        disabled={edgeControlsDisabled}
+                      />
+                    </label>
                     <label className="style-control">
                       <span>Color</span>
                       <input

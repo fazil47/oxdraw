@@ -456,6 +456,26 @@ body > div:first-of-type {
   cursor: pointer;
 }
 
+.style-control input[type="text"] {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  padding: 0.45rem 0.55rem;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
+.style-control input[type="text"]:focus {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 1px;
+}
+
+.label-control {
+  width: 100%;
+}
+
 .style-control.image-control {
   width: 100%;
 }
@@ -504,7 +524,8 @@ body > div:first-of-type {
 }
 
 .style-control input[type="color"]:disabled,
-.style-control select:disabled {
+.style-control select:disabled,
+.style-control input[type="text"]:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }

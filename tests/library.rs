@@ -1,5 +1,7 @@
 use anyhow::Result;
-use oxdraw::{AddEdgeInput, AddNodeInput, Diagram, EdgeArrowDirection, EdgeKind, EditorCore};
+use oxdraw::{
+    AddEdgeInput, AddNodeInput, Diagram, EdgeArrowDirection, EdgeKind, EditorCore, RenameLabelInput,
+};
 
 #[test]
 fn diagram_parse_and_render_svg() -> Result<()> {
@@ -138,6 +140,29 @@ fn diagram_rejects_edge_with_missing_endpoint() -> Result<()> {
 }
 
 #[test]
+fn diagram_renames_node_label() -> Result<()> {
+    let mut diagram = Diagram::parse("graph TD\n    A[Start]\n")?;
+
+    let changed = diagram.rename_node("A", Some("Renamed"))?;
+
+    assert!(changed);
+    assert!(diagram.to_definition().contains("A[Renamed]"));
+    Ok(())
+}
+
+#[test]
+fn diagram_renames_edge_label_and_can_remove_it() -> Result<()> {
+    let mut diagram = Diagram::parse("graph TD\n    A[Start] -->|old| B[End]\n")?;
+
+    assert!(diagram.rename_edge("A --> B", Some("new"))?);
+    assert!(diagram.to_definition().contains("A -->|new| B"));
+
+    assert!(diagram.rename_edge("A --> B", None)?);
+    assert!(diagram.to_definition().contains("A --> B"));
+    Ok(())
+}
+
+#[test]
 fn editor_core_adds_then_deletes_node_and_edge() -> Result<()> {
     let mut core = EditorCore::from_source("graph TD\n    A[Start]\n", "white")?;
 
@@ -157,5 +182,28 @@ fn editor_core_adds_then_deletes_node_and_edge() -> Result<()> {
     assert!(core.delete_node("B")?);
     assert!(!core.source()?.contains("B[End]"));
 
+    Ok(())
+}
+
+#[test]
+fn editor_core_renames_labels() -> Result<()> {
+    let mut core = EditorCore::from_source("graph TD\n    A[Start] -->|old| B[End]\n", "white")?;
+
+    assert!(core.rename_node(
+        "A",
+        RenameLabelInput {
+            label: Some("Begin".to_string()),
+        },
+    )?);
+    assert!(core.rename_edge(
+        "A --> B",
+        RenameLabelInput {
+            label: Some("next".to_string()),
+        },
+    )?);
+
+    let source = core.source()?;
+    assert!(source.contains("A[Begin]"));
+    assert!(source.contains("A -->|next| B"));
     Ok(())
 }

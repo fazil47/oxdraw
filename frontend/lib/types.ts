@@ -174,6 +174,10 @@ export interface AddEdgeInput {
   arrow?: EdgeArrowDirection;
 }
 
+export interface RenameLabelInput {
+  label?: string;
+}
+
 export interface SearchResult {
   file: string;
   line: number;

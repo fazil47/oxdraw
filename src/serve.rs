@@ -10,7 +10,7 @@ use axum::http::StatusCode;
 use axum::http::{HeaderValue, header};
 use axum::response::IntoResponse;
 use axum::response::Response;
-use axum::routing::{delete, get, post, put};
+use axum::routing::{get, patch, post, put};
 use axum::{Json, Router};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
@@ -604,6 +604,27 @@ impl ServeState {
         Ok(true)
     }
 
+    async fn rename_node(&self, node_id: &str, input: RenameLabelInput) -> Result<bool> {
+        let diagram = {
+            let _guard = self.source_lock.lock().await;
+            let source = tokio::fs::read_to_string(&self.source_path)
+                .await
+                .with_context(|| format!("failed to read '{}'", self.source_path.display()))?;
+            let mut diagram = Diagram::parse(&source)?;
+            if !diagram.rename_node(node_id, input.label.as_deref())? {
+                return Ok(false);
+            }
+            let rewritten = diagram.to_definition();
+            tokio::fs::write(&self.source_path, rewritten.as_bytes())
+                .await
+                .with_context(|| format!("failed to write '{}'", self.source_path.display()))?;
+            diagram
+        };
+
+        self.prune_overrides_for(&diagram).await?;
+        Ok(true)
+    }
+
     async fn add_edge(&self, input: AddEdgeInput) -> Result<bool> {
         let diagram = {
             let _guard = self.source_lock.lock().await;
@@ -612,6 +633,27 @@ impl ServeState {
                 .with_context(|| format!("failed to read '{}'", self.source_path.display()))?;
             let mut diagram = Diagram::parse(&source)?;
             if !diagram.add_edge(input)? {
+                return Ok(false);
+            }
+            let rewritten = diagram.to_definition();
+            tokio::fs::write(&self.source_path, rewritten.as_bytes())
+                .await
+                .with_context(|| format!("failed to write '{}'", self.source_path.display()))?;
+            diagram
+        };
+
+        self.prune_overrides_for(&diagram).await?;
+        Ok(true)
+    }
+
+    async fn rename_edge(&self, edge_id: &str, input: RenameLabelInput) -> Result<bool> {
+        let diagram = {
+            let _guard = self.source_lock.lock().await;
+            let source = tokio::fs::read_to_string(&self.source_path)
+                .await
+                .with_context(|| format!("failed to read '{}'", self.source_path.display()))?;
+            let mut diagram = Diagram::parse(&source)?;
+            if !diagram.rename_edge(edge_id, input.label.as_deref())? {
                 return Ok(false);
             }
             let rewritten = diagram.to_definition();
@@ -780,8 +822,14 @@ pub async fn run_serve(args: ServeArgs, ui_root: Option<PathBuf>) -> Result<()> 
         .route("/api/diagram/nodes", post(post_node))
         .route("/api/diagram/edges", post(post_edge))
         .route("/api/diagram/nodes/:id/image", put(put_node_image))
-        .route("/api/diagram/nodes/:id", delete(delete_node))
-        .route("/api/diagram/edges/:id", delete(delete_edge))
+        .route(
+            "/api/diagram/nodes/:id",
+            patch(patch_node).delete(delete_node),
+        )
+        .route(
+            "/api/diagram/edges/:id",
+            patch(patch_edge).delete(delete_edge),
+        )
         .route("/api/codemap/mapping", get(get_codemap_mapping))
         .route("/api/codemap/status", get(get_codemap_status))
         .route("/api/codemap/file", get(get_codemap_file))
@@ -1147,6 +1195,28 @@ async fn post_edge(
     Json(payload): Json<AddEdgeInput>,
 ) -> Result<Json<MutationResponse>, (StatusCode, String)> {
     match state.add_edge(payload).await {
+        Ok(changed) => Ok(Json(MutationResponse { changed })),
+        Err(err) => Err((StatusCode::BAD_REQUEST, err.to_string())),
+    }
+}
+
+async fn patch_node(
+    State(state): State<Arc<ServeState>>,
+    AxumPath(node_id): AxumPath<String>,
+    Json(payload): Json<RenameLabelInput>,
+) -> Result<Json<MutationResponse>, (StatusCode, String)> {
+    match state.rename_node(&node_id, payload).await {
+        Ok(changed) => Ok(Json(MutationResponse { changed })),
+        Err(err) => Err((StatusCode::BAD_REQUEST, err.to_string())),
+    }
+}
+
+async fn patch_edge(
+    State(state): State<Arc<ServeState>>,
+    AxumPath(edge_id): AxumPath<String>,
+    Json(payload): Json<RenameLabelInput>,
+) -> Result<Json<MutationResponse>, (StatusCode, String)> {
+    match state.rename_edge(&edge_id, payload).await {
         Ok(changed) => Ok(Json(MutationResponse { changed })),
         Err(err) => Err((StatusCode::BAD_REQUEST, err.to_string())),
     }

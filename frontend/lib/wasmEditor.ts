@@ -21,6 +21,8 @@ export interface WasmEditorCore {
   setSource(source: string): void;
   addNode(input: unknown): boolean;
   addEdge(input: unknown): boolean;
+  renameNode(id: string, input: unknown): boolean;
+  renameEdge(id: string, input: unknown): boolean;
   deleteNode(id: string): boolean;
   deleteEdge(id: string): boolean;
 }

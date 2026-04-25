@@ -292,6 +292,34 @@ export class WasmEditorCore {
         return ret[0] !== 0;
     }
     /**
+     * @param {string} id
+     * @param {any} input
+     * @returns {boolean}
+     */
+    renameEdge(id, input) {
+        const ptr0 = passStringToWasm0(id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.wasmeditorcore_renameEdge(this.__wbg_ptr, ptr0, len0, input);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return ret[0] !== 0;
+    }
+    /**
+     * @param {string} id
+     * @param {any} input
+     * @returns {boolean}
+     */
+    renameNode(id, input) {
+        const ptr0 = passStringToWasm0(id, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.wasmeditorcore_renameNode(this.__wbg_ptr, ptr0, len0, input);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return ret[0] !== 0;
+    }
+    /**
      * @returns {any}
      */
     endEdgeDrag() {

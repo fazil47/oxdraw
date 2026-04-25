@@ -5,6 +5,7 @@ import {
   EdgeStyleUpdate,
   LayoutUpdate,
   NodeStyleUpdate,
+  RenameLabelInput,
   StyleUpdate,
   CodeMapMapping,
   SearchResult,
@@ -633,6 +634,72 @@ export async function addEdge(input: AddEdgeInput): Promise<boolean> {
   if (!response.ok) {
     const message = await response.text();
     throw new Error(message || `Failed to add edge: ${response.status}`);
+  }
+
+  const payload = (await response.json()) as { changed?: boolean };
+  return payload.changed ?? false;
+}
+
+export async function updateNodeLabel(
+  nodeId: string,
+  input: RenameLabelInput
+): Promise<boolean> {
+  if (MODE === "local") {
+    const core = await ensureLocalCore();
+    const changed = core.renameNode(nodeId, input);
+    if (changed) {
+      persistLocalCore(core);
+    }
+    return changed;
+  }
+
+  const response = await fetch(
+    `${API_BASE}/api/diagram/nodes/${encodeURIComponent(nodeId)}`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    }
+  );
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || `Failed to update node label: ${response.status}`);
+  }
+
+  const payload = (await response.json()) as { changed?: boolean };
+  return payload.changed ?? false;
+}
+
+export async function updateEdgeLabel(
+  edgeId: string,
+  input: RenameLabelInput
+): Promise<boolean> {
+  if (MODE === "local") {
+    const core = await ensureLocalCore();
+    const changed = core.renameEdge(edgeId, input);
+    if (changed) {
+      persistLocalCore(core);
+    }
+    return changed;
+  }
+
+  const response = await fetch(
+    `${API_BASE}/api/diagram/edges/${encodeURIComponent(edgeId)}`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    }
+  );
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || `Failed to update edge label: ${response.status}`);
   }
 
   const payload = (await response.json()) as { changed?: boolean };

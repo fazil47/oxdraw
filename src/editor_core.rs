@@ -6,7 +6,7 @@ use crate::diagram::{LayoutOverrides, Point, align_geometry, edge_identifier};
 use crate::utils::split_source_and_overrides;
 use crate::{
     AddEdgeInput, AddNodeInput, CanvasSize, Diagram, DiagramKind, EdgeArrowDirection, EdgeKind,
-    EdgeOverride,
+    EdgeOverride, RenameLabelInput,
 };
 
 #[derive(Debug, Clone, Serialize)]
@@ -1112,6 +1112,16 @@ impl EditorCore {
         Ok(true)
     }
 
+    pub fn rename_node(&mut self, id: &str, input: RenameLabelInput) -> Result<bool> {
+        let mut diagram = Diagram::parse(&self.definition)?;
+        if !diagram.rename_node(id, input.label.as_deref())? {
+            return Ok(false);
+        }
+        self.definition = diagram.to_definition();
+        self.drag_state = None;
+        Ok(true)
+    }
+
     pub fn add_edge(&mut self, input: AddEdgeInput) -> Result<bool> {
         let mut diagram = Diagram::parse(&self.definition)?;
         if !diagram.add_edge(input)? {
@@ -1121,6 +1131,16 @@ impl EditorCore {
         let node_ids: HashSet<String> = diagram.nodes.keys().cloned().collect();
         let edge_ids: HashSet<String> = diagram.edges.iter().map(edge_identifier).collect();
         self.overrides.prune(&node_ids, &edge_ids);
+        self.drag_state = None;
+        Ok(true)
+    }
+
+    pub fn rename_edge(&mut self, id: &str, input: RenameLabelInput) -> Result<bool> {
+        let mut diagram = Diagram::parse(&self.definition)?;
+        if !diagram.rename_edge(id, input.label.as_deref())? {
+            return Ok(false);
+        }
+        self.definition = diagram.to_definition();
         self.drag_state = None;
         Ok(true)
     }
@@ -1468,6 +1488,26 @@ mod wasm {
         pub fn add_edge(&self, input: JsValue) -> Result<bool, JsValue> {
             let input: AddEdgeInput = serde_wasm_bindgen::from_value(input).map_err(to_js_error)?;
             self.inner.borrow_mut().add_edge(input).map_err(to_js_error)
+        }
+
+        #[wasm_bindgen(js_name = renameNode)]
+        pub fn rename_node(&self, id: &str, input: JsValue) -> Result<bool, JsValue> {
+            let input: RenameLabelInput =
+                serde_wasm_bindgen::from_value(input).map_err(to_js_error)?;
+            self.inner
+                .borrow_mut()
+                .rename_node(id, input)
+                .map_err(to_js_error)
+        }
+
+        #[wasm_bindgen(js_name = renameEdge)]
+        pub fn rename_edge(&self, id: &str, input: JsValue) -> Result<bool, JsValue> {
+            let input: RenameLabelInput =
+                serde_wasm_bindgen::from_value(input).map_err(to_js_error)?;
+            self.inner
+                .borrow_mut()
+                .rename_edge(id, input)
+                .map_err(to_js_error)
         }
 
         #[wasm_bindgen(js_name = deleteNode)]
