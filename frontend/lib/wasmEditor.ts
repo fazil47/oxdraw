@@ -51,13 +51,22 @@ function withBasePath(path: string): string {
   return `${normalizedBase}${normalizedPath}`;
 }
 
+function withAssetCacheKey(path: string): string {
+  const url = new URL(withBasePath(path), window.location.origin);
+  const cacheKey = new URLSearchParams(window.location.search).get("cacheKey");
+  if (cacheKey) {
+    url.searchParams.set("cacheKey", cacheKey);
+  }
+  return url.toString();
+}
+
 async function loadWasmModule(): Promise<WasmModule> {
   if (!modulePromise) {
     const dynamicImport = new Function(
       "path",
       "return import(/* webpackIgnore: true */ path);"
     ) as (path: string) => Promise<WasmModule>;
-    modulePromise = dynamicImport(withBasePath("/oxdraw_wasm.js"));
+    modulePromise = dynamicImport(withAssetCacheKey("/oxdraw_wasm.js"));
   }
   return modulePromise;
 }
@@ -68,9 +77,10 @@ export async function createWasmEditor(
 ): Promise<WasmEditorCore> {
   const wasm = await loadWasmModule();
   if (!initPromise) {
+    const wasmUrl = withAssetCacheKey("/oxdraw_wasm_bg.wasm");
     initPromise = wasm
-      .default({ module_or_path: withBasePath("/oxdraw_wasm_bg.wasm") })
-      .catch(() => wasm.default(withBasePath("/oxdraw_wasm_bg.wasm")));
+      .default({ module_or_path: wasmUrl })
+      .catch(() => wasm.default(wasmUrl));
   }
   await initPromise;
   return new wasm.WasmEditorCore(source, background);
