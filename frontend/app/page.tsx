@@ -1219,19 +1219,13 @@ const handleAddNode = useCallback(async () => {
     return;
   }
 
-  const label = window.prompt("Node label", "New node");
-  if (label === null) {
-    return;
-  }
-
   const id = generateUnusedNodeId(diagram.nodes);
-  const trimmedLabel = label.trim();
   try {
     setSaving(true);
     setError(null);
     const changed = await addNode({
       id,
-      label: trimmedLabel || id,
+      label: "New node",
       shape: "rectangle",
     });
     if (!changed) {
@@ -1275,18 +1269,12 @@ const handleConnectNodeClick = useCallback(
       return;
     }
 
-    const label = window.prompt("Edge label (optional)", "");
-    if (label === null) {
-      return;
-    }
-
     try {
       setSaving(true);
       setError(null);
       const changed = await addEdge({
         from: connectSourceNodeId,
         to: nodeId,
-        label: label.trim() || undefined,
         kind: "solid",
         arrow: "forward",
       });
